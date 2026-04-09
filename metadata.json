@@ -1,0 +1,7 @@
+{
+  "name": "Lumière Estética Avançada",
+  "description": "Clínica de estética de luxo em Recife, oferecendo tratamentos avançados e atendimento personalizado.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
