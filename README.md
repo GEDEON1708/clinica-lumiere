@@ -54,8 +54,9 @@ Variáveis disponíveis:
 
 - VITE_SUPABASE_URL
 - VITE_SUPABASE_ANON_KEY
-- VITE_BOOKING_WEBHOOK_URL
 - VITE_BOOKING_WEBHOOK_PROVIDER
+- VITE_BOOKING_SYNC_FUNCTION_NAME
+- VITE_BOOKING_WEBHOOK_URL
 
 ### Desenvolvimento
 
@@ -80,25 +81,42 @@ Se quiser usar persistência real de reservas:
 
 Com isso, o site passa a salvar reservas no banco e o painel administrativo deixa de depender do fallback local.
 
-## Integração com Calendário Externo
+## Integração Real com Google Calendar
 
-O projeto já está preparado para sincronizar reservas com uma agenda real sem acoplar segredo no front-end.
+O projeto agora inclui uma integração real com Google Calendar usando Supabase Edge Function e conta de serviço do Google, evitando expor credenciais no front-end.
 
-Estratégia recomendada:
+### Como funciona
 
 1. O site salva a reserva no Supabase.
-2. A aplicação envia um webhook com os dados da reserva.
-3. Seu backend, Edge Function, n8n, Make ou outro orquestrador cria ou atualiza o evento no calendário.
-4. A resposta da integração retorna status, provedor, horário sincronizado e identificador externo do evento.
+2. O front invoca a Function google-calendar-sync com o bookingId.
+3. A Function busca a reserva no banco com service role.
+4. A Function cria ou atualiza o evento no Google Calendar.
+5. O status da sincronização fica salvo na própria tabela bookings.
 
-Essa abordagem permite integrar com:
+### O que configurar
 
-- Google Calendar
-- Outlook Calendar
-- Cal.com
-- n8n
-- Make
-- backend próprio em Node, Nest, Laravel ou outro stack
+1. Crie ou escolha um Google Calendar da clínica.
+2. Crie uma Service Account no Google Cloud.
+3. Compartilhe o calendário com o e-mail da Service Account com permissão para editar eventos.
+4. Configure os secrets da Supabase Edge Function:
+   - SUPABASE_URL
+   - SUPABASE_SERVICE_ROLE_KEY
+   - GOOGLE_SERVICE_ACCOUNT_EMAIL
+   - GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+   - GOOGLE_CALENDAR_ID
+   - GOOGLE_CALENDAR_TIMEZONE
+   - GOOGLE_CALENDAR_LOCATION
+5. Faça deploy da Function localizada em supabase/functions/google-calendar-sync.
+6. Defina em .env.local:
+   - VITE_BOOKING_WEBHOOK_PROVIDER=google-calendar
+   - VITE_BOOKING_SYNC_FUNCTION_NAME=google-calendar-sync
+
+### Observações
+
+- A criação do evento usa a duração real do procedimento escolhido.
+- Alterações de status também sincronizam com a agenda.
+- Cancelamentos podem ser refletidos no evento do calendário.
+- Se você preferir outro provedor, o fluxo por webhook genérico continua disponível.
 
 ## Rotas Relevantes
 
@@ -123,6 +141,8 @@ src/
    pages/
 supabase/
    bookings.sql
+   functions/
+      google-calendar-sync/
 ```
 
 ## Direção de Arquitetura e Refatoração Futura

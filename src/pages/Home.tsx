@@ -227,7 +227,7 @@ const Home = () => {
           <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
             <Link
               to="/agendamento"
-              className="inline-flex items-center justify-center rounded-full bg-white px-8 py-4 text-center text-[11px] font-bold uppercase tracking-[0.28em] text-[#8f5f2b] shadow-[0_16px_34px_rgba(96,58,24,0.16)] transition-all hover:-translate-y-0.5 hover:bg-[#fff7ef] hover:text-[#7b4f25]"
+              className="cta-button-light inline-flex min-w-55 items-center justify-center rounded-full px-8 py-4 text-center text-[11px] font-bold uppercase tracking-[0.28em]"
             >
               Agendar agora
             </Link>

@@ -207,6 +207,7 @@ const BookingSystem = ({ initialServiceId }: BookingSystemProps) => {
       const newBooking = await createBooking({
         serviceId: selectedService.id,
         serviceTitle: selectedService.title,
+        serviceDuration: selectedService.duration,
         date: formData.date,
         time: formData.time,
         name: formData.name.trim(),

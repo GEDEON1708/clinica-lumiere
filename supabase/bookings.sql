@@ -4,6 +4,7 @@ create table if not exists public.bookings (
   id uuid primary key default gen_random_uuid(),
   service_id text not null,
   service_title text not null,
+  service_duration text not null default '60 min',
   appointment_date date not null,
   appointment_time text not null,
   client_name text not null,

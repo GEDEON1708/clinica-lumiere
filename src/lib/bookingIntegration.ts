@@ -1,8 +1,10 @@
+import { hasSupabaseConfig, supabase } from '@/src/lib/supabase';
 import type { BookingRecord, BookingStatus, BookingSyncProvider, BookingSyncSnapshot } from '@/src/lib/bookingTypes';
 import { defaultBookingSyncSnapshot } from '@/src/lib/bookingTypes';
 
 const webhookUrl = import.meta.env.VITE_BOOKING_WEBHOOK_URL?.trim() ?? '';
 const configuredProvider = import.meta.env.VITE_BOOKING_WEBHOOK_PROVIDER?.trim() ?? 'custom-webhook';
+const syncFunctionName = import.meta.env.VITE_BOOKING_SYNC_FUNCTION_NAME?.trim() || 'google-calendar-sync';
 
 const allowedProviders = new Set<BookingSyncProvider>([
   'none',
@@ -29,23 +31,29 @@ const normalizeProvider = (value: string): BookingSyncProvider => {
   return allowedProviders.has(normalized) ? normalized : 'custom-webhook';
 };
 
-const activeProvider = webhookUrl ? normalizeProvider(configuredProvider) : 'none';
+const preferredProvider = normalizeProvider(configuredProvider);
+const shouldUseSupabaseFunction = preferredProvider === 'google-calendar' && hasSupabaseConfig && Boolean(supabase);
+const activeProvider = shouldUseSupabaseFunction ? 'google-calendar' : webhookUrl ? preferredProvider : 'none';
 
 export const bookingCalendarConfig = {
-  enabled: Boolean(webhookUrl),
+  enabled: shouldUseSupabaseFunction || Boolean(webhookUrl),
   provider: activeProvider,
   providerLabel: providerLabels[activeProvider],
   webhookUrl,
+  syncFunctionName,
+  managedByServer: shouldUseSupabaseFunction,
 };
 
 type BookingWebhookPayload = {
   event: 'booking.created' | 'booking.status_changed';
   provider: BookingSyncProvider;
   source: string;
+  bookingId: string;
   booking: {
     id: string;
     serviceId: string;
     serviceTitle: string;
+    serviceDuration: string;
     date: string;
     time: string;
     name: string;
@@ -73,15 +81,56 @@ const readResponseData = async (response: Response) => {
 
 const createFailedSnapshot = (message: string): BookingSyncSnapshot => ({
   calendarSyncStatus: 'failed',
-  calendarProvider: activeProvider === 'none' ? 'custom-webhook' : activeProvider,
+  calendarProvider: activeProvider === 'none' ? preferredProvider : activeProvider,
   externalEventId: '',
   syncedAt: '',
   syncError: message,
 });
 
+const mapResponseToSnapshot = (responseData: Record<string, unknown> | null): BookingSyncSnapshot => ({
+  calendarSyncStatus:
+    responseData?.calendarSyncStatus === 'pending' ||
+    responseData?.calendarSyncStatus === 'synced' ||
+    responseData?.calendarSyncStatus === 'failed' ||
+    responseData?.calendarSyncStatus === 'not_configured'
+      ? responseData.calendarSyncStatus
+      : 'synced',
+  calendarProvider:
+    typeof responseData?.provider === 'string'
+      ? normalizeProvider(responseData.provider)
+      : bookingCalendarConfig.provider,
+  externalEventId: typeof responseData?.eventId === 'string' ? responseData.eventId : '',
+  syncedAt: typeof responseData?.syncedAt === 'string' ? responseData.syncedAt : new Date().toISOString(),
+  syncError: typeof responseData?.syncError === 'string' ? responseData.syncError : '',
+});
+
+const invokeSupabaseSyncFunction = async (payload: BookingWebhookPayload): Promise<BookingSyncSnapshot> => {
+  if (!supabase) {
+    return createFailedSnapshot('Cliente Supabase indisponível para sincronização da agenda.');
+  }
+
+  const { data, error } = await supabase.functions.invoke(bookingCalendarConfig.syncFunctionName, {
+    body: {
+      event: payload.event,
+      bookingId: payload.bookingId,
+      previousStatus: payload.previousStatus,
+    },
+  });
+
+  if (error) {
+    return createFailedSnapshot(error.message);
+  }
+
+  return mapResponseToSnapshot((data ?? null) as Record<string, unknown> | null);
+};
+
 const postBookingWebhook = async (payload: BookingWebhookPayload): Promise<BookingSyncSnapshot> => {
   if (!bookingCalendarConfig.enabled) {
     return defaultBookingSyncSnapshot();
+  }
+
+  if (bookingCalendarConfig.managedByServer) {
+    return invokeSupabaseSyncFunction(payload);
   }
 
   try {
@@ -100,16 +149,7 @@ const postBookingWebhook = async (payload: BookingWebhookPayload): Promise<Booki
       throw new Error(detail);
     }
 
-    return {
-      calendarSyncStatus: 'synced',
-      calendarProvider:
-        typeof responseData?.provider === 'string'
-          ? normalizeProvider(responseData.provider)
-          : bookingCalendarConfig.provider,
-      externalEventId: typeof responseData?.eventId === 'string' ? responseData.eventId : '',
-      syncedAt: typeof responseData?.syncedAt === 'string' ? responseData.syncedAt : new Date().toISOString(),
-      syncError: '',
-    };
+    return mapResponseToSnapshot(responseData);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao sincronizar a reserva com a agenda externa.';
     return createFailedSnapshot(message);
@@ -121,10 +161,12 @@ export const syncCreatedBooking = async (booking: BookingRecord) =>
     event: 'booking.created',
     provider: bookingCalendarConfig.provider,
     source: booking.source,
+    bookingId: booking.id,
     booking: {
       id: booking.id,
       serviceId: booking.serviceId,
       serviceTitle: booking.serviceTitle,
+      serviceDuration: booking.serviceDuration,
       date: booking.date,
       time: booking.time,
       name: booking.name,
@@ -144,11 +186,13 @@ export const syncUpdatedBookingStatus = async (
     event: 'booking.status_changed',
     provider: bookingCalendarConfig.provider,
     source: booking.source,
+    bookingId: booking.id,
     previousStatus,
     booking: {
       id: booking.id,
       serviceId: booking.serviceId,
       serviceTitle: booking.serviceTitle,
+      serviceDuration: booking.serviceDuration,
       date: booking.date,
       time: booking.time,
       name: booking.name,

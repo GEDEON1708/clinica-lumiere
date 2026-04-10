@@ -1,4 +1,4 @@
-import { syncCreatedBooking, syncUpdatedBookingStatus } from '@/src/lib/bookingIntegration';
+import { bookingCalendarConfig, syncCreatedBooking, syncUpdatedBookingStatus } from '@/src/lib/bookingIntegration';
 import { hasSupabaseConfig, supabase } from '@/src/lib/supabase';
 import {
   defaultBookingSyncSnapshot,
@@ -23,6 +23,7 @@ type SupabaseBookingRow = {
   id: string;
   service_id: string;
   service_title: string;
+  service_duration?: string | null;
   appointment_date: string;
   appointment_time: string;
   client_name: string;
@@ -66,6 +67,7 @@ const mapSupabaseRow = (row: SupabaseBookingRow): BookingRecord => ({
   id: row.id,
   serviceId: row.service_id,
   serviceTitle: row.service_title,
+  serviceDuration: row.service_duration ?? '60 min',
   date: row.appointment_date,
   time: row.appointment_time,
   name: row.client_name,
@@ -137,6 +139,10 @@ const persistSupabaseSyncSnapshot = async (
     return mergedBooking;
   }
 
+  if (bookingCalendarConfig.managedByServer) {
+    return mergedBooking;
+  }
+
   const { data, error } = await supabase
     .from(BOOKINGS_TABLE)
     .update({
@@ -183,6 +189,7 @@ export const createBooking = async (input: BookingInput): Promise<BookingRecord>
       id: `LM-${Date.now().toString().slice(-6)}`,
       serviceId: input.serviceId,
       serviceTitle: input.serviceTitle,
+      serviceDuration: input.serviceDuration,
       date: input.date,
       time: input.time,
       name: input.name,
@@ -209,6 +216,7 @@ export const createBooking = async (input: BookingInput): Promise<BookingRecord>
     .insert({
       service_id: input.serviceId,
       service_title: input.serviceTitle,
+      service_duration: input.serviceDuration,
       appointment_date: input.date,
       appointment_time: input.time,
       client_name: input.name,
@@ -227,7 +235,9 @@ export const createBooking = async (input: BookingInput): Promise<BookingRecord>
   const createdBooking = mapSupabaseRow(data as SupabaseBookingRow);
   const syncSnapshot = await syncCreatedBooking(createdBooking);
 
-  return persistSupabaseSyncSnapshot(createdBooking, syncSnapshot);
+  return bookingCalendarConfig.managedByServer
+    ? mergeBookingSyncSnapshot(createdBooking, syncSnapshot)
+    : persistSupabaseSyncSnapshot(createdBooking, syncSnapshot);
 };
 
 export const updateBookingStatus = async (bookingId: string, status: BookingStatus): Promise<BookingRecord> => {
@@ -278,5 +288,7 @@ export const updateBookingStatus = async (bookingId: string, status: BookingStat
   }
 
   const syncSnapshot = await syncUpdatedBookingStatus(updatedBooking, previousBooking.status);
-  return persistSupabaseSyncSnapshot(updatedBooking, syncSnapshot);
+  return bookingCalendarConfig.managedByServer
+    ? mergeBookingSyncSnapshot(updatedBooking, syncSnapshot)
+    : persistSupabaseSyncSnapshot(updatedBooking, syncSnapshot);
 };

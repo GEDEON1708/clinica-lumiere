@@ -15,6 +15,7 @@ export interface BookingRecord extends BookingSyncSnapshot {
   id: string;
   serviceId: string;
   serviceTitle: string;
+  serviceDuration: string;
   date: string;
   time: string;
   name: string;
@@ -29,6 +30,7 @@ export interface BookingRecord extends BookingSyncSnapshot {
 export interface BookingInput {
   serviceId: string;
   serviceTitle: string;
+  serviceDuration: string;
   date: string;
   time: string;
   name: string;
