@@ -218,14 +218,17 @@ const Home = () => {
       <Testimonials />
 
       <section className="px-4 pb-20 sm:px-6 md:pb-24">
-        <div className="mx-auto max-w-6xl overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#c69b61_0%,#a97434_52%,#8f5f2b_100%)] px-6 py-12 text-center text-white shadow-[0_28px_70px_rgba(167,116,52,0.35)] md:rounded-[40px] md:px-12 md:py-14">
+        <div className="mx-auto max-w-6xl overflow-hidden rounded-4xl bg-[linear-gradient(135deg,#c69b61_0%,#a97434_52%,#8f5f2b_100%)] px-6 py-12 text-center text-white shadow-[0_28px_70px_rgba(167,116,52,0.35)] md:rounded-[40px] md:px-12 md:py-14">
           <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-white/72">Pronta para viver essa experiência</p>
           <h2 className="serif mt-4 text-3xl italic sm:text-4xl md:text-6xl">Seu próximo cuidado pode começar hoje.</h2>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-white/80 sm:text-lg sm:leading-8">
             Reserve um horário, receba confirmação rápida e descubra o protocolo ideal para o seu objetivo em {CLINIC_INFO.neighborhood}.
           </p>
           <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-            <Link to="/agendamento" className="rounded-full bg-white px-8 py-4 text-[11px] font-bold uppercase tracking-[0.28em] text-gold transition-all hover:bg-cream">
+            <Link
+              to="/agendamento"
+              className="inline-flex items-center justify-center rounded-full bg-white px-8 py-4 text-center text-[11px] font-bold uppercase tracking-[0.28em] text-[#8f5f2b] shadow-[0_16px_34px_rgba(96,58,24,0.16)] transition-all hover:-translate-y-0.5 hover:bg-[#fff7ef] hover:text-[#7b4f25]"
+            >
               Agendar agora
             </Link>
             <a href={`tel:${CLINIC_INFO.phone.replace(/\D/g, '')}`} className="rounded-full border border-white/35 px-8 py-4 text-[11px] font-bold uppercase tracking-[0.28em] text-white transition-colors hover:bg-white/10">
